@@ -1,0 +1,367 @@
+	
+1. Test Lab - Jenkins-Docker-Dockerhub-K8s-nodeJS-CICD
+---------------------------------------------------------
+
+GitHub Repo - https://github.com/devopscloudworld/jenkins-nodejs-docker-k8s.git
+
+Tools Used
+-----------
+
+GitHub
+Jenkins
+Docker     
+dockerhub 
+Kubernetes
+
+
+*** Installing Jenkins ***
+=========================
+
+Apply one of the approach below
+-----------------------------
+
+Method 1 -
+--------
+
+1. Create AWS EC2 Instance of AMI Ubuntu 18 with t2.medium instance type.
+Make sure during creation provide the below user data to install jenkins
+
+User data
+#!/bin/bash
+sudo apt update
+sudo apt install openjdk-8-jdk -y
+sudo apt install ca-certificates -y
+sudo apt install maven git wget unzip -y
+wget -q -O - https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo apt-key add -
+sudo sh -c 'echo deb https://pkg.jenkins.io/debian-stable binary/ > /etc/apt/sources.list.d/jenkins.list'
+sudo apt-get update
+sudo apt-get install jenkins -y
+
+2. To connect to jenkins server, ssh to jenkins server by using username as ubuntu and password as key and run below commands
+
+sudo sudo
+cat /var/lib/jenkins/secrets/initialAdminPassword  			- Note down the password in output
+
+
+3. Copy public IP and access jenkins as http://publi IP :8080
+4. Enter the password noted in step 2 and click continue
+5. Click on install suggested plugins and wait to finish all plugin installation
+6. After plugin installation, enter username and password (e.g. admin/admin)
+7. Click on start using jenkins
+
+
+Jenkins Plugin required
+-----------------------
+Note - You can install plugins as per the requirement. Few regularly used plugins are listed below.
+
+Slack notification
+build pipeline
+ssh pipeline steps
+kubernets-cli
+kubectl
+docker
+docker pipeline
+docker-build-step
+cloudbees docker build and push
+artifactory
+terraform
+kubernets credential
+Cloudbees AWS credentials
+maven
+
+
+
+Method 2
+---------
+
+During class, pre-baked AMI will be shared, launch new instance of type t2.medium type
+Access the jenkins with below URL
+Add tag as Name - Jenkins
+
+http://public IP:8080
+
+===========================================================================================================
+
+*** Fork GitHub App Repo to Your GitHub Account ***
+====================================================
+
+1. Access GitHub URL - https://github.com/devopscloudworld/jenkins-nodejs-docker-k8s.git
+2. Click on Fork option on right top
+3. Enter your GitHub credentials if required
+4. Verify above repo is Forked in your GitHub account
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*** Clone GitHub app repo to your local workstation *** 
+========================================================
+
+1. Login to GitHub and select above cloned repository
+2. Click on Code button -> Copy HTTPS URL displayed
+3. Login to workstation EC2 server with ec2-user and switch to root - sudo su
+4. Run command - git clone https://github.com/devopscloudworld/jenkins-nodejs-docker-k8s.git
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*** Configure GitHub with Jenkins ***
+=========================================
+
+1. Access Jenkins - http://<jenkins-publicIP:8080>
+2. Click on New Item - Enter name - demo-nodejs-docker-k8s
+3. Select pipeline type -> Apply - Save
+4. Click on configure
+5. In pipeline-> script section, enter below code
+
+pipeline{
+    agent any
+    stages {
+        stage('Checkout') {
+            steps{
+                
+            }
+        }
+
+    }
+}
+
+6. Click on pipeline syntax -> Snippet Generator
+7. In Sample Step - Select checkout: Checkout from version control
+8. SCM  - Git
+9. In Repostiry URL - Provide your above copied github repo URL that you cloned
+10. As its public repo, no need to enter credentials.
+11. In Branch, Instead of master - provide main
+12. Click on generate pipeline script
+12. Copy generated script in above pipeline steps section,
+
+e.g. 
+
+pipeline{
+    agent any
+    stages {
+        stage('Checkout') {
+            steps{
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/devopscloudworld/jenkins-nodejs-docker-k8s.git']]])
+            }
+        }
+
+    }
+}
+
+
+13. Apply and Save
+14. Click on Build Now to test. It should be successful.
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*** Install Docker on Jenkins Server ***
+=========================================
+
+1. Login to Jenkins server. Switch to root - sudo su
+2. Run command - apt install docker.io
+3. Run command - usermod -a -G docker jenkins
+4. Run command - service jenkins restart
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+*** Configure Docker with Jenkins for Docker Image build ***
+==============================================================
+
+1. Make sure required Docker plugins are installed on Jenkins
+2. Log in to Jenkins and open the Project - demo-nodejs-docker-k8s
+3. Click on configure and go to pipeline script
+4. Add new stage like below.
+
+stage('Build Docker Image') {
+            steps {
+                script {
+                  sh 'docker build .'
+                }
+            }
+        }
+
+e.g. Final full script will look like below.
+
+
+pipeline{
+    agent any
+    stages {
+        stage('Checkout') {
+            steps{
+              checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/devopscloudworld/jenkins-nodejs-docker-k8s.git']]])  
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                  sh 'docker build -t test .'
+                }
+            }
+        }
+        
+
+    }
+}
+
+5. Click on Build now and test it - Job should be successful
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+*** Tagging Docker image with Dockerhub reponame ***
+=================================================
+
+1. Login to Jenkins and open the item demo-nodejs-docker-k8s - > Configure
+2. Add below section in pipeline script and save and apply
+
+	stage('Tag Docker Image....') {
+            steps {
+                sh 'docker tag test pdockersavant/devops-demo:v1'
+            }
+        }
+
+e.g. Full Pipeline script will look like below..
+
+pipeline{
+    agent any
+    stages {
+        stage('Checkout') {
+            steps{
+              checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/devopscloudworld/jenkins-nodejs-docker-k8s.git']]])  
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                  sh 'docker build -t test .'
+                }
+            }
+        }
+        
+        stage('Tag Docker Image....') {
+            steps {
+                sh 'docker tag test awsfaculty05/devops-demo:v1'
+            }
+        }
+        
+    }
+}
+
+
+3. click on Build now and verify
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+*** Integrating Dockerhub with Jenkins ***
+=======================================
+
+1. Go to Jenkins -> manage jenkins -> Manage Credentials -> Global credentials and add dockerhub username and password
+2. Add 3rd stage in jenkinsfile like below. Please modify as per your repo name
+
+e.g
+stage('Publish Artifacts To Dockerhub....') {
+            steps {
+                sh 'docker image ls'
+                sh 'docker logout'
+                sh 'echo $dockerhub_PSW | docker login -u $dockerhub_USR --password-stdin docker.io'
+                sh 'docker push awsfaculty05/devops-demo:v1'
+            }
+        }
+
+e.g. Full Pipeline script will look like below..
+
+pipeline {
+    agent any
+    environment{
+        dockerhub=credentials('dockerhub')
+    }
+    
+    stages {
+        stage('Git Checkout....') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: 'Git', url: 'https://github.com/devopscloudworld/jenkins-nodejs-docker-k8s.git']]])
+            }
+        }
+        
+        stage('Build Docker Image....') {
+            steps {
+                sh 'docker build -t awsfaculty05/devops-demo:v1 . '
+            }
+        }
+        
+        stage('Publish Artifacts To Dockerhub....') {
+            steps {
+                sh 'docker image ls'
+                sh 'docker logout'
+                sh 'echo $dockerhub_PSW | docker login -u $dockerhub_USR --password-stdin docker.io'
+                sh 'docker push pdockersavant/devops-demo:v1'
+            }
+        }
+    }
+}
+
+3. Click on build now and verify job is successful
+4. Verify docker image has been uploaded to Dockerhub in your mentioned repository
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Deploying Application to K8s Cluster
+---------------------------------
+
+Note - You should have any K8s setup up and running. You should have below plugins installed
+Kubernetes Continuous Deploy 1.0
+
+Go to K8s setup > Master server -> root home directory at below path
+
+ /root/.kube/config and copy all the content in notepad
+
+1. Go to Jenkins -> Manage Jenkins -> Manage Credentials -> Global -> Add Credentials
+2. Kind - Kubernetes Configuration
+Scope - Global
+ID - kubecreds
+Kubeconfig - Enter directly and paste above kubeconfig credentials noted from k8s setup.
+3. Ok
+4. Go to job -> configure and add below stage in jenkinsfile
+
+     stage('Deploying App to Kubernetes') {
+            steps {
+                script {
+                     kubernetesDeploy(configs: "nodejs-app-deploy.yml", kubeconfigId: "kubecreds")
+                        }
+                  }
+        }
+
+5. Build the job and verify the deployment is created and app is running
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Integrate GitHub with Jenkins for auto trigger Jenkins pipeline
+--------------------------------------------------------------
+
+1. Login to Your github account
+2. Open the repository i.e. jenkins-nodejs-docker-k8s
+3. Click on Settings
+4. Click on Webhooks
+5. Click on Add webhook
+6. In payload URL - Enter jenkins web URL e.g. http://65.0.199.129:8080/
+7. Append "/github-webhook/" at the end of the URL. It will look like this finally. http://65.0.199.129:8080/github-webhook/
+8. content type - application json
+9. In section "Which events would you like to trigger this webhook?", Select "Let me select individual events"
+10. check ‘Pull Requests’ and ‘Pushes
+11. At the end of this option, make sure that the ‘Active’ option is checked and click on ‘Add webhook’
+12. Login to Jenkins URL and got to your project - demo-nodejs-docker-k8s
+13. Click on configure
+14. Select build trigger tab
+15. Select "GitHub hook trigger for GITScm polling" -> Click apply and then save
+
+End to End Verification of Jenkins Pipeline
+-----------------------------------------
+
+1. On your workstation, go to your code where you checked out or folder 
+2. Modify server.js file with some contents
+3. Run - git add
+4. Run - git commit -m "Modified V2" server.js
+5. Run - git push
+6. It will auto trigger pipeline and all stages should get successed successfully
+7. Verify console logs
